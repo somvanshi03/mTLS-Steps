@@ -1,0 +1,17 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-to-haproxy
+  namespace: default
+spec:
+  podSelector: {}   # applies to ALL pods in namespace
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: haproxy-egress
+    ports:
+    - protocol: TCP
+      port: 8443

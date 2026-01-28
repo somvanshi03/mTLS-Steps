@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: haproxy-config
+  namespace: default
+data:
+  haproxy.cfg: |
+    global
+      log stdout format raw local0
+
+    defaults
+      mode tcp
+      timeout connect 10s
+      timeout client  30s
+      timeout server  30s
+
+    frontend fe_tls
+      bind *:8443
+      default_backend be_tls
+
+    backend be_tls
+      server external-api api.mydomain.com:443 ssl verify required ca-file /certs/api.mydomain.com.pem crt /certs/api.mydomain.com-client.pem

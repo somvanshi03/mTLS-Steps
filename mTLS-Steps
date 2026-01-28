@@ -1,0 +1,275 @@
+# Create RG
+az group create --location eastus --resource-group agicdemo
+
+# Create AKS Cluster
+az aks create --name agic-cluster \
+  --resource-group agicdemo \
+  --network-plugin azure \
+  --network-policy azure \
+  --node-vm-size Standard_F2as_v6 \
+  --enable-managed-identity \
+  --enable-addons ingress-appgw \
+  --appgw-name agic-appgw \
+  --appgw-subnet-cidr "10.225.0.0/16" \
+  --node-count 1 \
+  --enable-cluster-autoscaler \
+  --min-count 1 \
+  --max-count 2 \
+  --generate-ssh-keys
+
+# Get App Gateway resource ID from AKS
+appGatewayId=$(az aks show -n agic-cluster -g agicdemo -o tsv --query "addonProfiles.ingressApplicationGateway.config.effectiveApplicationGatewayId")
+
+# Get App Gateway subnet resource ID (disable Git Bash path conversion)
+appGatewaySubnetId=$(MSYS_NO_PATHCONV=1 az network application-gateway show --ids "$appGatewayId" -o tsv --query "gatewayIPConfigurations[0].subnet.id")
+
+echo "appGatewayId=$appGatewayId"
+echo "appGatewaySubnetId=$appGatewaySubnetId"
+
+agicIdentityClientId=$(az aks show -n agic-cluster -g agicdemo -o tsv --query "addonProfiles.ingressApplicationGateway.identity.clientId")
+
+MSYS_NO_PATHCONV=1 az role assignment create --assignee "$agicIdentityClientId" --role "Network Contributor" --scope "$appGatewaySubnetId"
+  
+  
+#Verify agentpool size 
+az aks show -g agicdemo -n agic-cluster --query "agentPoolProfiles[].vmSize"
+
+
+# Get kubeconfig
+az aks get-credentials -g agicdemo -n agic-cluster --overwrite-existing
+
+
+
+az aks show -g agicdemo -n agic-cluster --query "networkProfile.{podCidr:podCidr,serviceCidr:serviceCidr,dnsServiceIp:dnsServiceIp}" -o table
+
+# Check node and Pods
+kubectl.exe get nodes
+kubectl.exe get pods
+kubectl.exe get pods -A
+
+
+# deploy sample application 
+kubectl.exe apply -f kube-manifests/
+kubectl.exe get all
+
+# Go inside pod
+kubectl exec -it <PODName> -- /bin/bash
+winpty kubectl exec -it haproxy-egress-6569f8758f-f6db8 -- sh
+winpty kubectl exec -it myapp-nginx-deployment-699fffc8ff-qc8pp -- sh
+
+## install package inside pod to check connectivity
+
+apt update -y
+apt install iputils-ping -y 
+curl -I google.com
+
+### This means internet is open and accessible by POD.
+
+# Install network policy 
+kubectl.exe apply -f NetworkPolicy
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-egress
+  namespace: default
+spec:
+  podSelector: {}
+  policyTypes:
+  - Egress
+  egress: []
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns-to-kube-dns
+  namespace: default
+spec:
+  podSelector: {}
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+      podSelector:
+        matchLabels:
+          k8s-app: kube-dns
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-internal-ranges
+  namespace: default
+spec:
+  podSelector: {}
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    # Replace these with your actual INTERNAL ranges (VNet, pod CIDR, service CIDR)
+    - ipBlock:
+        cidr: 10.0.0.0/8
+    - ipBlock:
+        cidr: 172.16.0.0/12
+    - ipBlock:
+        cidr: 192.168.0.0/16
+		
+
+# Create a Secret that holds your app1 certificate and key:
+cat api.mydomain.com.crt api.mydomain.com.key > api.mydomain.com-client.pem
+kubectl create secret generic app1-mtls-secret --from-file=api.mydomain.com.crt --from-file=api.mydomain.com.key  --from-file=api.mydomain.com.pem
+
+######### kubectl create secret generic app1-mtls-secret --from-file=api.mydomain.com-client.pem --from-file=api.mydomain.com.pem
+  
+  
+# List Secrets
+kubectl get secrets
+
+
+
+
+# Create mapconfig
+kubectl.exe apply -f MapConfig/
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: haproxy-config
+  namespace: default
+data:
+  haproxy.cfg: |
+    global
+      log stdout format raw local0
+
+    defaults
+      mode tcp
+      timeout connect 10s
+      timeout client  30s
+      timeout server  30s
+
+    frontend fe_tls
+      bind *:8443
+      default_backend be_tls
+
+    backend be_tls
+      server external-api api.mydomain.com:443 ssl verify required ca-file /certs/api.mydomain.com.pem crt /certs/api.mydomain.com-client.pem
+
+# Create deploy for haproxy
+kubectl.exe apply -f Deploy/
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: haproxy-egress
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: haproxy-egress
+  template:
+    metadata:
+      labels:
+        app: haproxy-egress
+    spec:
+      containers:
+        - name: haproxy
+          image: haproxy:2.9
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8443
+          volumeMounts:
+            - name: haproxy-config
+              mountPath: /usr/local/etc/haproxy
+            - name: mtls-certs
+              mountPath: /certs
+              readOnly: true
+          args:
+            - -f
+            - /usr/local/etc/haproxy/haproxy.cfg
+            - -db
+      volumes:
+        - name: haproxy-config
+          configMap:
+            name: haproxy-config
+        - name: mtls-certs
+          secret:
+            secretName: app1-mtls-secret
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: haproxy-egress
+  namespace: default
+spec:
+  type: ClusterIP
+  selector:
+    app: haproxy-egress
+  ports:
+    - name: mtls
+      port: 8443
+      targetPort: 8443
+
+# pod to haproxy connection.
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-to-haproxy
+  namespace: default
+spec:
+  podSelector: {}   # applies to ALL pods in namespace
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: haproxy-egress
+    ports:
+    - protocol: TCP
+      port: 8443
+
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-haproxy-to-external
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      app: haproxy-egress
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - ipBlock:
+        cidr: 203.0.113.45/32
+    - ipBlock:
+        cidr: 203.0.113.46/32
+    ports:
+    - protocol: TCP
+      port: 443
+#########################
+
+[ App Pod ]
+   |
+   |  (TCP 8443 allowed by NetworkPolicy)
+   v
+[ HAProxy Service (ClusterIP) ]
+   |
+   |  (mTLS over TCP 443)
+   v
+[ api.mydomain.com ]
+
+
