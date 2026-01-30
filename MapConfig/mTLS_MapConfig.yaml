@@ -19,4 +19,4 @@ data:
       default_backend be_tls
 
     backend be_tls
-      server external-api api.mydomain.com:443 ssl verify required ca-file /certs/api.mydomain.com.pem crt /certs/api.mydomain.com-client.pem
+      server external-api r1r2.3disystems.com:443 ssl verify required ca-file /certs/gd_bundle-g2-g1.crt crt /certs/client-mtls.pem

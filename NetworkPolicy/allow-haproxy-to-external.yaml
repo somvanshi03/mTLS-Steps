@@ -12,9 +12,9 @@ spec:
   egress:
   - to:
     - ipBlock:
-        cidr: 203.0.113.45/32
+        cidr: 13.91.0.38/32
     - ipBlock:
-        cidr: 203.0.113.46/32
+        cidr: 13.91.0.38/32
     ports:
     - protocol: TCP
       port: 443

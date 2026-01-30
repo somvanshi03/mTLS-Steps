@@ -125,7 +125,7 @@ spec:
 # Create a Secret that holds your app1 certificate and key:
 cat api.mydomain.com.crt api.mydomain.com.key > api.mydomain.com-client.pem
 kubectl create secret generic app1-mtls-secret --from-file=api.mydomain.com.crt --from-file=api.mydomain.com.key  --from-file=api.mydomain.com.pem
-
+kubectl create secret generic app1-mtls-secret --from-file=gd_bundle-g2-g1.crt --from-file=domain.decrypted.key  --from-file=client-mtls.pem
 ######### kubectl create secret generic app1-mtls-secret --from-file=api.mydomain.com-client.pem --from-file=api.mydomain.com.pem
   
   
@@ -273,3 +273,17 @@ spec:
 [ api.mydomain.com ]
 
 
+kubectl debug -it haproxy-egress-7b58978c7f-kpbf6 --image=nicolaka/netshoot --target=haproxy --profile=general
+
+Try to ping from HAProxy.
+
+
+[ App Pod ]
+   |
+   | TCP 8443 (allowed by NetworkPolicy)
+   v
+[ HAProxy (ClusterIP) ]
+   |
+   | TCP 443 + mTLS (allowed by NetworkPolicy)
+   v
+[ api.mydomain.com ]
