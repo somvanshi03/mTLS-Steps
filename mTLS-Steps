@@ -262,6 +262,10 @@ spec:
       port: 443
 #########################
 
+curl -vk http://haproxy-egress:8443
+
+curl -vk r1r2.3disystems.com
+
 [ App Pod ]
    |
    |  (TCP 8443 allowed by NetworkPolicy)
@@ -287,3 +291,129 @@ Try to ping from HAProxy.
    | TCP 443 + mTLS (allowed by NetworkPolicy)
    v
 [ api.mydomain.com ]
+
+openssl s_client -connect https://r1r2.3disystems.com:443 -servername https://r1r2.3disystems.com
+
+openssl s_client -connect r1r2.3disystems.com:443 -servername r1r2.3disystems.com
+
+
+
+#################
+
+Setup NAT Gateway:
+
+
+### 2.1 Create a static Public IP (outbound IP)
+
+```bash
+az network public-ip create \
+  --resource-group agicdemo \
+  --name aks-nat-pip \
+  --sku Standard \
+  --allocation-method Static
+```
+
+Verify:
+
+```bash
+az network public-ip show \
+  -g agicdemo \
+  -n aks-nat-pip \
+  --query ipAddress \
+  -o tsv
+```
+
+Save this IP — it will be your **final outbound IP**.
+
+---
+
+### 2.2 Create the NAT Gateway (THIS is missing)
+
+```bash
+az network nat gateway create \
+  --resource-group agicdemo \
+  --name aks-nat-gateway \
+  --public-ip-addresses aks-nat-pip \
+  --idle-timeout 10
+```
+
+Verify immediately:
+
+```bash
+az network nat gateway show \
+  -g agicdemo \
+  -n aks-nat-gateway \
+  --query id \
+  -o tsv
+```
+
+You **must** see an ID like:
+
+```
+/subscriptions/.../resourceGroups/agicdemo/providers/Microsoft.Network/natGateways/aks-nat-gateway
+```
+
+---
+
+# 🟢 Step 3: Attach NAT Gateway to AKS node subnet
+
+You already identified the correct subnet:
+
+* **VNet**: `aks-vnet-26370068`
+* **Subnet**: `aks-subnet`
+* **RG**: `MC_agicdemo_agic-cluster_eastus`
+
+### 3.1 Get subnet ID
+
+```bash
+NODE_SUBNET_ID=$(az network vnet subnet show \
+  -g MC_agicdemo_agic-cluster_eastus \
+  --vnet-name aks-vnet-26370068 \
+  -n aks-subnet \
+  --query id \
+  -o tsv)
+
+echo "NODE_SUBNET_ID=$NODE_SUBNET_ID"
+```
+
+---
+
+### 3.2 Get NAT Gateway ID
+
+```bash
+NAT_GW_ID=$(az network nat gateway show \
+  -g agicdemo \
+  -n aks-nat-gateway \
+  --query id \
+  -o tsv)
+
+echo "NAT_GW_ID=$NAT_GW_ID"
+```
+
+---
+
+### 3.3 Attach (Git Bash–safe)
+
+```bash
+MSYS_NO_PATHCONV=1 az network vnet subnet update \
+  --ids "$NODE_SUBNET_ID" \
+  --nat-gateway "$NAT_GW_ID"
+```
+
+⏱ ~30 seconds
+✅ No AKS restart
+✅ No pod restart
+
+---
+
+# ✅ Step 4: Verify (proof)
+
+### 4.1 Confirm attachment
+
+```bash
+MSYS_NO_PATHCONV=1 az network vnet subnet show \
+  --ids "$NODE_SUBNET_ID" \
+  --query natGateway.id \
+  -o tsv
+```
+
