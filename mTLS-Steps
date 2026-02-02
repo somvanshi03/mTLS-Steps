@@ -297,6 +297,18 @@ openssl s_client -connect https://r1r2.3disystems.com:443 -servername https://r1
 openssl s_client -connect r1r2.3disystems.com:443 -servername r1r2.3disystems.com
 
 
+#################
+
+App Pod
+  ↓
+HAProxy Pod
+  ↓
+AKS Node (aks-subnet)
+  ↓
+NAT Gateway (static IP)
+  ↓
+Internet / api.mydomain.com
+
 
 #################
 

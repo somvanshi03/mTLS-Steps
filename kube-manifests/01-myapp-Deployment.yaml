@@ -13,11 +13,17 @@ spec:
     metadata:
       labels:
         app: myapp-nginx
+        egress: haproxy-required
     spec:
       containers:
         - name: myapp-nginx
           image: mridul08/myhttpdimage101:v4
           ports:
             - containerPort: 80
+          env:
+            - name: HTTPS_PROXY
+              value: http://haproxy-egress.default.svc.cluster.local:8443
+            - name: HTTP_PROXY
+              value: http://haproxy-egress.default.svc.cluster.local:8443
 
    
