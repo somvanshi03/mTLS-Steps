@@ -1,18 +1,25 @@
 
 ## create VM on azure
 ```bash
+# Resource Group
 az group create --name demo-rg --location eastus
 
+# vNet with Subnet
 az network vnet create --resource-group demo-rg --name demo-vnet --address-prefix 10.0.0.0/16 --subnet-name demo-subnet --subnet-prefix 10.0.1.0/24
 
+# NSG
 az network nsg create --resource-group demo-rg --name demo-nsg
 
+# Create Inbound rule
 az network nsg rule create --resource-group demo-rg --nsg-name demo-nsg --name allow-ssh --priority 1000 --direction Inbound --access Allow --protocol Tcp --destination-port-range 22 --source-address-prefixes '*' --destination-address-prefixes '*'
 
+# Attach NSG with subnet
 az network vnet subnet update --resource-group demo-rg --vnet-name demo-vnet --name demo-subnet --network-security-group demo-nsg
 
+# Create VM
 az vm create --resource-group demo-rg --name ubuntu22-vm --vnet-name demo-vnet --subnet demo-subnet --image Ubuntu2204 --size Standard_B2s --admin-username azureuser --authentication-type password --admin-password 'Str0ngP@ssword2026!' --public-ip-sku Standard
 
+# Show Public IP
 az vm show --resource-group demo-rg --name ubuntu22-vm -d --query publicIps -o tsv
 
 ```
