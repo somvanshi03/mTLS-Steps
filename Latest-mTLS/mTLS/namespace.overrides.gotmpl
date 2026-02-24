@@ -1,0 +1,24 @@
+namespace: flows-pen-test
+clusterName: aks-scp-prd-uks-st-pen
+appName: mtls-outbound
+
+mtls:
+  certPath: /etc/mtls
+  secretName: haproxy-mtls-secret
+  
+  # These come from 1Password
+  clientCombinedPem: '{{ fetchSecretValue "op://45txfpwcgchtx7cuo5vlhej6ry/visa/mtls-outbound-certs/client-combined.pem" }}'
+  caBundlePem: '{{ fetchSecretValue "op://45txfpwcgchtx7cuo5vlhej6ry/visa/mtls-outbound-certs/gd_bundle-g2-g1.crt" }}'
+
+  domains:  # MUST be inside mtls
+    - name: visa
+      host: r1r2.3disystems.com
+      port: 443
+
+networkPolicy:
+  enabled: true
+  externalCidrs:
+    - 13.91.0.38/32
+  internalCidrs:
+    - 10.120.0.0/16
+    - 172.16.0.0/16
