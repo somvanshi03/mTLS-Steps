@@ -1,66 +1,401 @@
-kubectl get pods -n flows-pen-test |grep haproxy
-haproxy-egress-6f9c985c9d-p44p6                       0/1     CrashLoopBackOff   6 (89s ago)   7m19s
-root@jumpbox:~#
-root@jumpbox:~# kubectl get secrets -n flows-pen-test
-NAME                                   TYPE                             DATA   AGE
-acr-secret                             kubernetes.io/dockerconfigjson   1      145d
-azure-secrets                          Opaque                           3      146d
-eureka-access-management-secrets       Opaque                           2      146d
-eureka-secrets-management-secrets      Opaque                           1      146d
-flowmanager-secrets                    Opaque                           1      146d
-flows-pen-test-grafana                 Opaque                           3      146d
-flows-pen-test-keycloak                Opaque                           1      146d
-grafana-config                         Opaque                           1      146d
-haproxy-mtls-secret                    Opaque                           2      7m59s
-ingress-tls-secret                     kubernetes.io/tls                2      146d
-init-db-secrets                        Opaque                           7      146d
-keycloak-database-secret               Opaque                           5      146d
-litellm-secrets                        Opaque                           6      146d
-phoenix-secrets                        Opaque                           5      146d
-promtail                               Opaque                           1      146d
-sh.helm.release.v1.flows-pen-test.v1   helm.sh/release.v1               1      146d
-sh.helm.release.v1.flows-pen-test.v2   helm.sh/release.v1               1      145d
-sh.helm.release.v1.haproxy-egress.v1   helm.sh/release.v1               1      7m59s
-sh.helm.release.v1.loki.v1             helm.sh/release.v1               1      146d
-sh.helm.release.v1.loki.v2             helm.sh/release.v1               1      145d
-sh.helm.release.v1.promtail.v1         helm.sh/release.v1               1      146d
-sh.helm.release.v1.promtail.v2         helm.sh/release.v1               1      145d
-temporal-keycloak-secrets              Opaque                           4      146d
-temporal-secret-default                Opaque                           1      146d
-temporal-secret-visibility             Opaque                           1      146d
-webhook-service-secrets                Opaque                           1      146d
-root@jumpbox:~# kubectl get secret haproxy-mtls-secret -n flows-pen-test -o yaml | grep -A 5 "data"
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: haproxy-config
+  namespace: {{ .Release.Namespace }}
+
 data:
-  client-combined.pem: b3A6Ly80NXR4ZnB3Y2djaHR4N2N1bzV2bGhlajZyeS92aXNhL210bHMtb3V0Ym91bmQtY2VydHMvY2xpZW50LWNvbWJpbmVkLnBlbQo=
-  gd_bundle-g2-g1.crt: b3A6Ly80NXR4ZnB3Y2djaHR4N2N1bzV2bGhlajZyeS92aXNhL210bHMtb3V0Ym91bmQtY2VydHMvZ2RfYnVuZGxlLWcyLWcxLmNydAo=
+  haproxy.cfg: |
+    global
+      log stdout format raw daemon
+
+    defaults
+      log global
+      mode http
+      timeout connect 10s
+      timeout client 60s
+      timeout server 60s
+
+    resolvers dns
+      nameserver kube-dns kube-dns.kube-system.svc.cluster.local:53
+
+    frontend http_front
+      bind *:{{ .Values.service.port }}
+
+{{- range .Values.mtls.domains }}
+      acl host_{{ .name }} hdr_dom(host) -i {{ .host }}
+      use_backend {{ .name }} if host_{{ .name }}
+{{- end }}
+
+    backend default_backend
+      http-request return status 503 content-type text/plain lf-string "No backend matched\\n"
+
+{{- range .Values.mtls.domains }}
+    backend {{ .name }}
+      mode http
+      server target {{ .host }}:{{ .port }} ssl verify required crt {{ $.Values.mtls.certPath }}/client-combined.pem ca-file {{ $.Values.mtls.certPath }}/gd_bundle-g2-g1.crt sni str({{ .host }}) alpn h2,http/1.1 resolvers dns resolve-prefer ipv4
+{{- end }}
+
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: haproxy-egress
+  namespace: {{ .Release.Namespace }}
+
+spec:
+  replicas: {{ .Values.replicaCount }}
+
+  selector:
+    matchLabels:
+      app: haproxy-egress
+
+  template:
+    metadata:
+      labels:
+        app: haproxy-egress
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/secrets.yaml") . | sha256sum }}
+
+    spec:
+      containers:
+        - name: haproxy
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+
+          args:
+            - "-f"
+            - "/usr/local/etc/haproxy/haproxy.cfg"
+            - "-db"
+
+          ports:
+            - containerPort: {{ .Values.service.port }}
+
+          volumeMounts:
+            - name: config
+              mountPath: /usr/local/etc/haproxy/haproxy.cfg
+              subPath: haproxy.cfg
+
+            - name: mtls
+              mountPath: {{ .Values.mtls.certPath }}
+              readOnly: true
+
+          readinessProbe:
+            tcpSocket:
+              port: {{ .Values.service.port }}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+
+          livenessProbe:
+            tcpSocket:
+              port: {{ .Values.service.port }}
+            initialDelaySeconds: 10
+            periodSeconds: 20
+
+          resources:
+{{ toYaml .Values.resources | indent 12 }}
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+
+      volumes:
+        - name: config
+          configMap:
+            name: haproxy-config
+
+        - name: mtls
+          secret:
+            secretName: {{ .Values.mtls.secretName }}
+			
+			
+{{- if .Values.networkPolicy.enabled }}
+
+########################################
+# Default Deny All Egress
+########################################
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Values.namespace }}-default-deny-egress
+  namespace: {{ .Values.namespace }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress: []
+
+---
+########################################
+# Allow DNS (kube-dns only)
+########################################
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Values.namespace }}-allow-dns
+  namespace: {{ .Values.namespace }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+---
+########################################
+# Allow Pods → HAProxy Only
+########################################
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Values.namespace }}-allow-egress-haproxy
+  namespace: {{ .Values.namespace }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: haproxy-egress
+      ports:
+        - protocol: TCP
+          port: {{ .Values.service.port }}
+
+---
+########################################
+# Allow HAProxy → External CIDRs
+########################################
+{{- if .Values.networkPolicy.externalCidrs }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Values.namespace }}-allow-haproxy-external
+  namespace: {{ .Values.namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app: haproxy-egress
+
+  policyTypes:
+    - Egress
+
+  egress:
+{{- range .Values.networkPolicy.externalCidrs }}
+    - to:
+        - ipBlock:
+            cidr: {{ . }}
+      ports:
+        - protocol: TCP
+          port: 443
+{{- end }}
+{{- end }}
+
+---
+########################################
+# Optional — Allow Internal CIDRs (values-driven)
+########################################
+{{- if .Values.networkPolicy.internalCidrs }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Values.namespace }}-allow-internal
+  namespace: {{ .Values.namespace }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+
+  egress:
+{{- range .Values.networkPolicy.internalCidrs }}
+    - to:
+        - ipBlock:
+            cidr: {{ . }}
+{{- end }}
+{{- end }}
+
+{{- end }}
+
+
+# secrets.yaml
+apiVersion: v1
 kind: Secret
 metadata:
-  annotations:
-    meta.helm.sh/release-name: haproxy-egress
-    meta.helm.sh/release-namespace: flows-pen-test
-  creationTimestamp: "2026-02-24T05:33:33Z"
+  name: {{ .Values.mtls.secretName }}
+  namespace: {{ .Release.Namespace }}
+type: Opaque
+
+data:
+  client-combined.pem: {{ .Files.Get "Certs/client-combined.pem" | b64enc }}
+  gd_bundle-g2-g1.crt: {{ .Files.Get "Certs/gd_bundle-g2-g1.crt" | b64enc }}
+  
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: haproxy-egress
+  namespace: {{ .Release.Namespace }}
+
+spec:
+  type: {{ .Values.service.type }}
+  selector:
+    app: haproxy-egress
+
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: {{ .Values.service.port }}
+      protocol: TCP
+      name: http
+	  
+apiVersion: v1
+kind: Pod
+metadata:
+  name: curl-test
+  namespace: flows-pen-test
   labels:
+    app: curl-test
+    purpose: mTLS-testing
+spec:
+  containers:
+  - name: curl
+    image: curlimages/curl
+    command: ["sleep", "3600"]
+    env:
+    # Direct connection variables (will be blocked by network policy)
+    - name: DIRECT_URL
+      value: "https://r1r2.3disystems.com:443"
+    - name: DIRECT_DOMAIN
+      value: "r1r2.3disystems.com"
+    - name: DIRECT_PORT
+      value: "443"
+    
+    # HAProxy connection variables (working mTLS path)
+    - name: HAPROXY_URL
+      value: "http://haproxy-egress:8443"
+    - name: HAPROXY_SVC
+      value: "haproxy-egress"
+    - name: HAPROXY_PORT
+      value: "8443"
+    - name: HOST_HEADER
+      value: "r1r2.3disystems.com"
+    
+    # Test commands as variables
+    - name: CMD_DIRECT
+      value: "curl -vk https://r1r2.3disystems.com:443"
+    - name: CMD_DIRECT_TIMEOUT
+      value: "curl -vk --connect-timeout 5 https://r1r2.3disystems.com:443"
+    - name: CMD_VIA_HAPROXY
+      value: "curl -v http://haproxy-egress:8443 -H 'Host: r1r2.3disystems.com'"
+    - name: CMD_HAPROXY_HEALTH
+      value: "curl -v http://haproxy-egress:8443/health -H 'Host: r1r2.3disystems.com'"
+    
+    # DNS and network test variables
+    - name: DNS_SERVER
+      value: "8.8.8.8"
+    - name: TEST_ENDPOINT
+      value: "r1r2.3disystems.com"
+    - name: EXPECTED_IP
+      value: "13.91.0.38"
+    
+    # Curl options
+    - name: CURL_OPTS
+      value: "-v --connect-timeout 5"
+    - name: CURL_OPTS_INSECURE
+      value: "-vk --connect-timeout 5"
+	  
+
+apiVersion: v2
+name: haproxy-egress
+description: HAProxy mTLS egress proxy
+type: application
+version: 0.1.0
+appVersion: "2.9"
 
 
+replicaCount: 1
 
-# Decode to see what's actually in the secret
-echo "b3A6Ly80NXR4ZnB3Y2djaHR4N2N1bzV2bGhlajZyeS92aXNhL210bHMtb3V0Ym91bmQtY2VydHMvY2xpZW50LWNvbWJpbmVkLnBlbQo=" | base64 -d
-# Output: op://45txfpwcgchtx7cuo5vlhej6ry/visa/mtls-outbound-certs/client-combined.pem
+image:
+  repository: haproxy
+  tag: "2.9"
+  pullPolicy: IfNotPresent
 
-echo "b3A6Ly80NXR4ZnB3Y2djaHR4N2N1bzV2bGhlajZyeS92aXNhL210bHMtb3V0Ym91bmQtY2VydHMvZ2RfYnVuZGxlLWcyLWcxLmNydAo=" | base64 -d
-# Output: op://45txfpwcgchtx7cuo5vlhej6ry/visa/mtls-outbound-certs/gd_bundle-g2-g1.crt
+service:
+  type: ClusterIP
+  port: 8443
 
+resources:
+  limits:
+    cpu: 200m
+    memory: 256Mi
+  requests:
+    cpu: 50m
+    memory: 64Mi
 
-echo "b3A6Ly80NXR4ZnB3Y2djaHR4N2N1bzV2bGhlajZyeS92aXNhL210bHMtb3V0Ym91bmQtY2VydHMvY2xpZW50LWNvbWJpbmVkLnBlbQo=" | base64 -d
-op://45txfpwcgchtx7cuo5vlhej6ry/visa/mtls-outbound-certs/client-combined.pem
-root@jumpbox:~# echo "b3A6Ly80NXR4ZnB3Y2djaHR4N2N1bzV2bGhlajZyeS92aXNhL210bHMtb3V0Ym91bmQtY2VydHMvZ2RfYnVuZGxlLWcyLWcxLmNydAo=" | base64 -d
-op://45txfpwcgchtx7cuo5vlhej6ry/visa/mtls-outbound-certs/gd_bundle-g2-g1.crt
+mtls:
+  certPath: /etc/mtls
+  secretName: haproxy-mtls-secret
+  certFolder: "Certs"  # Add this line
+  clientCombinedPem: ""
+  caBundlePem: ""
+  domains: []           # Will be overridden
 
+networkPolicy:
+  enabled: true
+  externalCidrs: []
+  internalCidrs: []
+  
+helmfile.yaml
 
-# Fetch the actual certificate content from 1Password
-op read "op://45txfpwcgchtx7cuo5vlhej6ry/visa/mtls-outbound-certs/client-combined.pem" > /tmp/client-combined.pem
-op read "op://45txfpwcgchtx7cuo5vlhej6ry/visa/mtls-outbound-certs/gd_bundle-g2-g1.crt" > /tmp/gd_bundle-g2-g1.crt
+helmDefaults:
+  timeout: 1500
+  wait: true
+  kubeContext: aks-scp-prd-uks-st-pen
 
-# Verify the files have actual certificate content (should start with "-----BEGIN")
-head -5 /tmp/client-combined.pem
-head -5 /tmp/gd_bundle-g2-g1.crt
+releases:
+  - name: haproxy-egress
+    namespace: flows-pen-test
+    chart: ../../../templated-overrides/raw-yaml-charts/mtls-outbound
+
+    values:
+      - namespace.overrides.gotmpl
+	  
+namespace.overrides.gotmpl
+
+namespace: flows-pen-test
+clusterName: aks-scp-prd-uks-st-pen
+appName: mtls-outbound
+
+mtls:
+  certPath: /etc/mtls
+  secretName: haproxy-mtls-secret
+  certFolder: "Certs"  # Add this to point to your certs folder
+  domains:
+    - name: visa
+      host: r1r2.3disystems.com
+      port: 443
+
+networkPolicy:
+  enabled: true
+  externalCidrs:
+    - 13.91.0.38/32
+  internalCidrs:
+    - 10.120.0.0/16
+    - 172.16.0.0/16
+
+above is working if we use cert from folder. 
+now my requient is to get cert from 1password and then create secrets
