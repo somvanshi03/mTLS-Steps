@@ -1,17 +1,42 @@
-kubectl logs -f haproxy-egress-6f9c985c9d-p44p6 -n flows-pen-test
-[NOTICE]   (1) : haproxy version is 2.9.15-e872a3f
-[NOTICE]   (1) : path to executable is /usr/local/sbin/haproxy
-[ALERT]    (1) : config : [/usr/local/etc/haproxy/haproxy.cfg:23] : 'server visa/target' : Couldn't open the ca-file '/etc/mtls/gd_bundle-g2-g1.crt' (no certificate or crl found).
-[ALERT]    (1) : config : 'ca-file' : unable to load /etc/mtls/gd_bundle-g2-g1.crt.
-[ALERT]    (1) : config : Error(s) found in configuration file : /usr/local/etc/haproxy/haproxy.cfg
-[ALERT]    (1) : config : Fatal errors found in configuration.
-
-
-kubectl get secret haproxy-mtls-secrets -n flows-pen-test -o yaml | grep -A 5 "data"
-Error from server (NotFound): secrets "haproxy-mtls-secrets" not found
-root@jumpbox:~# kubectl exec -it haproxy-egress-6f9c985c9d-p44p6 -n flows-pen-test -- ls -la /etc/mtls
-error: unable to upgrade connection: container not found ("haproxy")
-
-
 kubectl get pods -n flows-pen-test |grep haproxy
 haproxy-egress-6f9c985c9d-p44p6                       0/1     CrashLoopBackOff   6 (89s ago)   7m19s
+root@jumpbox:~#
+root@jumpbox:~# kubectl get secrets -n flows-pen-test
+NAME                                   TYPE                             DATA   AGE
+acr-secret                             kubernetes.io/dockerconfigjson   1      145d
+azure-secrets                          Opaque                           3      146d
+eureka-access-management-secrets       Opaque                           2      146d
+eureka-secrets-management-secrets      Opaque                           1      146d
+flowmanager-secrets                    Opaque                           1      146d
+flows-pen-test-grafana                 Opaque                           3      146d
+flows-pen-test-keycloak                Opaque                           1      146d
+grafana-config                         Opaque                           1      146d
+haproxy-mtls-secret                    Opaque                           2      7m59s
+ingress-tls-secret                     kubernetes.io/tls                2      146d
+init-db-secrets                        Opaque                           7      146d
+keycloak-database-secret               Opaque                           5      146d
+litellm-secrets                        Opaque                           6      146d
+phoenix-secrets                        Opaque                           5      146d
+promtail                               Opaque                           1      146d
+sh.helm.release.v1.flows-pen-test.v1   helm.sh/release.v1               1      146d
+sh.helm.release.v1.flows-pen-test.v2   helm.sh/release.v1               1      145d
+sh.helm.release.v1.haproxy-egress.v1   helm.sh/release.v1               1      7m59s
+sh.helm.release.v1.loki.v1             helm.sh/release.v1               1      146d
+sh.helm.release.v1.loki.v2             helm.sh/release.v1               1      145d
+sh.helm.release.v1.promtail.v1         helm.sh/release.v1               1      146d
+sh.helm.release.v1.promtail.v2         helm.sh/release.v1               1      145d
+temporal-keycloak-secrets              Opaque                           4      146d
+temporal-secret-default                Opaque                           1      146d
+temporal-secret-visibility             Opaque                           1      146d
+webhook-service-secrets                Opaque                           1      146d
+root@jumpbox:~# kubectl get secret haproxy-mtls-secret -n flows-pen-test -o yaml | grep -A 5 "data"
+data:
+  client-combined.pem: b3A6Ly80NXR4ZnB3Y2djaHR4N2N1bzV2bGhlajZyeS92aXNhL210bHMtb3V0Ym91bmQtY2VydHMvY2xpZW50LWNvbWJpbmVkLnBlbQo=
+  gd_bundle-g2-g1.crt: b3A6Ly80NXR4ZnB3Y2djaHR4N2N1bzV2bGhlajZyeS92aXNhL210bHMtb3V0Ym91bmQtY2VydHMvZ2RfYnVuZGxlLWcyLWcxLmNydAo=
+kind: Secret
+metadata:
+  annotations:
+    meta.helm.sh/release-name: haproxy-egress
+    meta.helm.sh/release-namespace: flows-pen-test
+  creationTimestamp: "2026-02-24T05:33:33Z"
+  labels:
