@@ -132,3 +132,17 @@ sudo apt update
 sudo apt install -y azure-cli
 az version
 ```
+
+## Check testing
+```bash
+
+# Test direct connection (should be blocked)
+kubectl exec curl-test -n flows-pen-test -- curl -vk --connect-timeout 5 https://r1r2.3disystems.com:443
+
+# Try common API paths
+kubectl exec curl-test -n flows-pen-test -- curl -v http://haproxy-egress:8443/api -H "Host: r1r2.3disystems.com"
+kubectl exec curl-test -n flows-pen-test -- curl -v http://haproxy-egress:8443/v1 -H "Host: r1r2.3disystems.com"
+kubectl exec curl-test -n flows-pen-test -- curl -v http://haproxy-egress:8443/health -H "Host: r1r2.3disystems.com"
+kubectl exec curl-test -n flows-pen-test -- curl -v http://haproxy-egress:8443/status -H "Host: r1r2.3disystems.com"
+kubectl exec curl-test -n flows-pen-test -- curl -v http://haproxy-egress:8443/swagger -H "Host: r1r2.3disystems.com"
+```
