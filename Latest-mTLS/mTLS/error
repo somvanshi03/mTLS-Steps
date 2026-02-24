@@ -55,3 +55,12 @@ echo "b3A6Ly80NXR4ZnB3Y2djaHR4N2N1bzV2bGhlajZyeS92aXNhL210bHMtb3V0Ym91bmQtY2VydH
 op://45txfpwcgchtx7cuo5vlhej6ry/visa/mtls-outbound-certs/client-combined.pem
 root@jumpbox:~# echo "b3A6Ly80NXR4ZnB3Y2djaHR4N2N1bzV2bGhlajZyeS92aXNhL210bHMtb3V0Ym91bmQtY2VydHMvZ2RfYnVuZGxlLWcyLWcxLmNydAo=" | base64 -d
 op://45txfpwcgchtx7cuo5vlhej6ry/visa/mtls-outbound-certs/gd_bundle-g2-g1.crt
+
+
+# Fetch the actual certificate content from 1Password
+op read "op://45txfpwcgchtx7cuo5vlhej6ry/visa/mtls-outbound-certs/client-combined.pem" > /tmp/client-combined.pem
+op read "op://45txfpwcgchtx7cuo5vlhej6ry/visa/mtls-outbound-certs/gd_bundle-g2-g1.crt" > /tmp/gd_bundle-g2-g1.crt
+
+# Verify the files have actual certificate content (should start with "-----BEGIN")
+head -5 /tmp/client-combined.pem
+head -5 /tmp/gd_bundle-g2-g1.crt
