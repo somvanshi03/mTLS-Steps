@@ -100,3 +100,27 @@ az aks show -g agicdemo -n agic-cluster --query "agentPoolProfiles[].vmSize"
 az aks get-credentials -g agicdemo -n agic-cluster --overwrite-existing
 
 ```
+## Install kubectl
+```bash
+sudo apt update
+sudo apt install -y apt-transport-https ca-certificates curl
+curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.31/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+sudo apt update
+sudo apt install -y kubectl
+kubectl version --client
+
+```
+## Install az cli
+```bash
+sudo apt update
+sudo apt install -y ca-certificates curl apt-transport-https lsb-release gnupg
+curl -sLS https://packages.microsoft.com/keys/microsoft.asc | \
+gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/microsoft.gpg > /dev/null
+AZ_REPO=$(lsb_release -cs)
+
+echo "deb [arch=amd64] https://packages.microsoft.com/repos/azure-cli/ $AZ_REPO main" | \
+sudo tee /etc/apt/sources.list.d/azure-cli.list
+sudo apt update
+sudo apt install -y azure-cli
+az version
+```
