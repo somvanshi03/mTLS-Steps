@@ -5,3 +5,9 @@ kubectl logs -f haproxy-egress-6f9c985c9d-p44p6 -n flows-pen-test
 [ALERT]    (1) : config : 'ca-file' : unable to load /etc/mtls/gd_bundle-g2-g1.crt.
 [ALERT]    (1) : config : Error(s) found in configuration file : /usr/local/etc/haproxy/haproxy.cfg
 [ALERT]    (1) : config : Fatal errors found in configuration.
+
+
+kubectl get secret haproxy-mtls-secrets -n flows-pen-test -o yaml | grep -A 5 "data"
+Error from server (NotFound): secrets "haproxy-mtls-secrets" not found
+root@jumpbox:~# kubectl exec -it haproxy-egress-6f9c985c9d-p44p6 -n flows-pen-test -- ls -la /etc/mtls
+error: unable to upgrade connection: container not found ("haproxy")
