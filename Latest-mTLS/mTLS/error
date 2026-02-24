@@ -40,3 +40,12 @@ metadata:
     meta.helm.sh/release-namespace: flows-pen-test
   creationTimestamp: "2026-02-24T05:33:33Z"
   labels:
+
+
+
+# Decode to see what's actually in the secret
+echo "b3A6Ly80NXR4ZnB3Y2djaHR4N2N1bzV2bGhlajZyeS92aXNhL210bHMtb3V0Ym91bmQtY2VydHMvY2xpZW50LWNvbWJpbmVkLnBlbQo=" | base64 -d
+# Output: op://45txfpwcgchtx7cuo5vlhej6ry/visa/mtls-outbound-certs/client-combined.pem
+
+echo "b3A6Ly80NXR4ZnB3Y2djaHR4N2N1bzV2bGhlajZyeS92aXNhL210bHMtb3V0Ym91bmQtY2VydHMvZ2RfYnVuZGxlLWcyLWcxLmNydAo=" | base64 -d
+# Output: op://45txfpwcgchtx7cuo5vlhej6ry/visa/mtls-outbound-certs/gd_bundle-g2-g1.crt
