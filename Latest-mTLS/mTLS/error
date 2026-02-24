@@ -11,3 +11,7 @@ kubectl get secret haproxy-mtls-secrets -n flows-pen-test -o yaml | grep -A 5 "d
 Error from server (NotFound): secrets "haproxy-mtls-secrets" not found
 root@jumpbox:~# kubectl exec -it haproxy-egress-6f9c985c9d-p44p6 -n flows-pen-test -- ls -la /etc/mtls
 error: unable to upgrade connection: container not found ("haproxy")
+
+
+kubectl get pods -n flows-pen-test |grep haproxy
+haproxy-egress-6f9c985c9d-p44p6                       0/1     CrashLoopBackOff   6 (89s ago)   7m19s
