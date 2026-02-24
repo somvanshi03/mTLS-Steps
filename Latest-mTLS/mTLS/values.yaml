@@ -1,0 +1,6 @@
+mtls:
+  certPath: /etc/mtls
+  secretName: haproxy-mtls-secret
+  clientCombinedPem: ""  # Will come from 1Password
+  caBundlePem: ""        # Will come from 1Password
+  domains: []            # Will be overridden
