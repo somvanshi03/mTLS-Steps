@@ -1,0 +1,12 @@
+helmDefaults:
+  timeout: 1500
+  wait: true
+  kubeContext: agic-cluster
+
+releases:
+  - name: haproxy-egress
+    namespace: flows-pen-test
+    chart: ../../../templated-overrides/raw-yaml-charts/mtls-outbound
+
+    values:
+      - namespace.overrides.gotmpl

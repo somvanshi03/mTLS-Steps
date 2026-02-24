@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: haproxy-config
+  namespace: {{ .Release.Namespace }}
+
+data:
+  haproxy.cfg: |
+    global
+      log stdout format raw daemon
+
+    defaults
+      log global
+      mode http
+      timeout connect 10s
+      timeout client 60s
+      timeout server 60s
+
+    resolvers dns
+      nameserver kube-dns kube-dns.kube-system.svc.cluster.local:53
+
+    frontend http_front
+      bind *:{{ .Values.service.port }}
+
+{{- range .Values.mtls.domains }}
+      acl host_{{ .name }} hdr_dom(host) -i {{ .host }}
+      use_backend {{ .name }} if host_{{ .name }}
+{{- end }}
+
+    backend default_backend
+      http-request return status 503 content-type text/plain lf-string "No backend matched\n"
+
+{{- range .Values.mtls.domains }}
+    backend {{ .name }}
+      mode http
+      server target {{ .host }}:{{ .port }} ssl verify required crt {{ $.Values.mtls.certPath }}/client-combined.pem ca-file {{ $.Values.mtls.certPath }}/gd_bundle-g2-g1.crt sni str({{ .host }}) alpn h2,http/1.1 resolvers dns resolve-prefer ipv4
+{{- end }}

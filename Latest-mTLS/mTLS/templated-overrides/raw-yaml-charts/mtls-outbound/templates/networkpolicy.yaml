@@ -1,0 +1,120 @@
+{{- if .Values.networkPolicy.enabled }}
+
+########################################
+# Default Deny All Egress
+########################################
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Values.namespace }}-default-deny-egress
+  namespace: {{ .Values.namespace }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress: []
+
+---
+########################################
+# Allow DNS (kube-dns only)
+########################################
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Values.namespace }}-allow-dns
+  namespace: {{ .Values.namespace }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+---
+########################################
+# Allow Pods → HAProxy Only
+########################################
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Values.namespace }}-allow-egress-haproxy
+  namespace: {{ .Values.namespace }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: haproxy-egress
+      ports:
+        - protocol: TCP
+          port: {{ .Values.service.port }}
+
+---
+########################################
+# Allow HAProxy → External CIDRs
+########################################
+{{- if .Values.networkPolicy.externalCidrs }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Values.namespace }}-allow-haproxy-external
+  namespace: {{ .Values.namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app: haproxy-egress
+
+  policyTypes:
+    - Egress
+
+  egress:
+{{- range .Values.networkPolicy.externalCidrs }}
+    - to:
+        - ipBlock:
+            cidr: {{ . }}
+      ports:
+        - protocol: TCP
+          port: 443
+{{- end }}
+{{- end }}
+
+---
+########################################
+# Optional — Allow Internal CIDRs (values-driven)
+########################################
+{{- if .Values.networkPolicy.internalCidrs }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Values.namespace }}-allow-internal
+  namespace: {{ .Values.namespace }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+
+  egress:
+{{- range .Values.networkPolicy.internalCidrs }}
+    - to:
+        - ipBlock:
+            cidr: {{ . }}
+{{- end }}
+{{- end }}
+
+{{- end }}
