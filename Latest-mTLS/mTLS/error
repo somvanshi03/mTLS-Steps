@@ -1,0 +1,43 @@
+  INFO: Running docker container...
+  helmfile initialization completed!
+  Building dependency release=haproxy-egress, chart=../../../templated-overrides/raw-yaml-charts/mtls-outbound
+  Listing releases matching ^haproxy-egress$
+  Upgrading release=haproxy-egress, chart=../../../templated-overrides/raw-yaml-charts/mtls-outbound
+  Release "haproxy-egress" does not exist. Installing it now.
+  FAILED RELEASES:
+  NAME             NAMESPACE        CHART                                                        VERSION   DURATION
+  haproxy-egress   flows-pen-test   ../../../templated-overrides/raw-yaml-charts/mtls-outbound                   1s
+  in /opt/workspace/apps/mtls-outbound/flows-pen-test/helmfile.yaml: failed processing release haproxy-egress: command "/opt/deploy-work-dir/helm" exited with non-zero status:
+  PATH:
+    /opt/deploy-work-dir/helm
+  ARGS:
+    0: helm (4 bytes)
+    1: --kube-context (14 bytes)
+    2: aks-scp-prd-uks-st-pen (22 bytes)
+    3: upgrade (7 bytes)
+    4: --install (9 bytes)
+    5: haproxy-egress (14 bytes)
+    6: ../../../templated-overrides/raw-yaml-charts/mtls-outbound (58 bytes)
+    7: --wait (6 bytes)
+    8: --timeout (9 bytes)
+    9: 1500s (5 bytes)
+    10: --create-namespace (18 bytes)
+    11: --kube-context (14 bytes)
+    12: aks-scp-prd-uks-st-pen (22 bytes)
+    13: --namespace (11 bytes)
+    14: flows-pen-test (14 bytes)
+    15: --values (8 bytes)
+    16: /tmp/helmfile2247191859/flows-pen-test-haproxy-egress-values-85686fcfc4 (71 bytes)
+    17: --reset-values (14 bytes)
+    18: --history-max (13 bytes)
+    19: 10 (2 bytes)
+  ERROR:
+    exit status 1
+  EXIT STATUS
+    1
+  STDERR:
+    Error: template: haproxy-egress/templates/deployment.yaml:20:28: executing "haproxy-egress/templates/deployment.yaml" at <include (print $.Template.BasePath "/secret.yaml") .>: error calling include: template: no template "haproxy-egress/templates/secret.yaml" associated with template "gotpl"
+  COMBINED OUTPUT:
+    Release "haproxy-egress" does not exist. Installing it now.
+    Error: template: haproxy-egress/templates/deployment.yaml:20:28: executing "haproxy-egress/templates/deployment.yaml" at <include (print $.Template.BasePath "/secret.yaml") .>: error calling include: template: no template "haproxy-egress/templates/secret.yaml" associated with template "gotpl"
+  Error: Process completed with exit code 1.
