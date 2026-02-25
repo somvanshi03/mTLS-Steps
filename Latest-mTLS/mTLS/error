@@ -53,3 +53,18 @@ kubectl exec -it deploy/your-app -n flows-pen-test -- /bin/sh
 # Now run this command inside the pod:
 curl -vk https://r1r2.3disystems.com
 
+
+# Test 1: Via proxy (should work)
+curl -vk https://r1r2.3disystems.com
+
+# Test 2: Direct connection (should be blocked by network policy)
+curl -vk --noproxy '*' https://r1r2.3disystems.com
+
+# Test 3: Check proxy environment variables
+env | grep -i proxy
+
+# Test 4: Verify HAProxy is reachable
+curl -v http://haproxy-egress:8443
+
+# Test 5: Using Host header method
+curl -vk http://haproxy-egress:8443 -H "Host: r1r2.3disystems.com"
