@@ -1,0 +1,363 @@
+## value
+replicaCount: 1
+
+image:
+  repository: haproxy
+  tag: "2.9"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 8443
+
+resources:
+  limits:
+    cpu: 200m
+    memory: 256Mi
+  requests:
+    cpu: 50m
+    memory: 64Mi
+
+mtls:
+  certPath: /etc/mtls
+  secretName: haproxy-mtls-secret
+  domains: []           # Will be overridden
+
+networkPolicy:
+  enabled: true
+  externalCidrs: []
+  internalCidrs: []     # Will be overridden
+
+## secrets
+
+{{- if .Values.mtls.domains }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Values.mtls.secretName }}
+  namespace: {{ .Release.Namespace }}
+type: Opaque
+stringData:
+{{- range .Values.mtls.domains }}
+  {{ .name }}-client-combined.pem: |
+{{- tpl .clientCombinedPem $ | nindent 4 }}
+  {{ .name }}-ca-bundle.crt: |
+{{- tpl .caBundlePem $ | nindent 4 }}
+{{- end }}
+{{- end }}
+
+## service
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: haproxy-egress
+  namespace: {{ .Release.Namespace }}
+spec:
+  type: {{ .Values.service.type }}
+  selector:
+    app: haproxy-egress
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: {{ .Values.service.port }}
+      protocol: TCP
+      name: http
+
+## configmap
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: haproxy-config
+  namespace: {{ .Release.Namespace }}
+data:
+  haproxy.cfg: |
+    global
+      log stdout format raw daemon
+      maxconn 4096
+
+    defaults
+      log global
+      mode http
+      timeout connect 10s
+      timeout client 60s
+      timeout server 60s
+      timeout tunnel 3600s  # For long-lived connections
+      option httplog
+      option dontlognull
+      option redispatch
+      retries 3
+
+    resolvers dns
+      nameserver kube-dns kube-dns.kube-system.svc.cluster.local:53
+      hold valid 10s
+
+    frontend http_front
+      bind *:{{ .Values.service.port }}
+      
+      # Health check endpoint
+      acl is_health_check path /health
+      use_backend health_check if is_health_check
+
+{{- range .Values.mtls.domains }}
+      # Domain: {{ .name }}
+      acl host_{{ .name }} hdr_dom(host) -i {{ .host }}
+      use_backend {{ .name }} if host_{{ .name }}
+{{- end }}
+
+    backend health_check
+      mode http
+      http-request return status 200 content-type text/plain lf-string "OK\n"
+
+    backend default_backend
+      http-request return status 503 content-type text/plain lf-string "No backend matched for this domain\n"
+
+{{- range .Values.mtls.domains }}
+backend {{ .name }}
+  mode http
+  server target {{ .host }}:{{ .port }} ssl verify required \
+    crt {{ $.Values.mtls.certPath }}/{{ .name }}-client-combined.pem \
+    ca-file {{ $.Values.mtls.certPath }}/{{ .name }}-ca-bundle.crt \
+    sni str({{ .host }}) \
+    alpn h2,http/1.1 \
+    resolvers dns \
+    resolve-prefer ipv4 \
+    check inter 30s fall 3 rise 2
+{{- end }}
+
+## deployment
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: haproxy-egress
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: haproxy-egress
+spec:
+  replicas: {{ .Values.replicaCount }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: haproxy-egress
+  template:
+    metadata:
+      labels:
+        app: haproxy-egress
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - haproxy-egress
+              topologyKey: kubernetes.io/hostname
+      containers:
+        - name: haproxy
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - "-f"
+            - "/usr/local/etc/haproxy/haproxy.cfg"
+            - "-db"
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          volumeMounts:
+            - name: config
+              mountPath: /usr/local/etc/haproxy/haproxy.cfg
+              subPath: haproxy.cfg
+            - name: mtls
+              mountPath: {{ .Values.mtls.certPath }}
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.service.port }}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.service.port }}
+            initialDelaySeconds: 10
+            periodSeconds: 20
+            failureThreshold: 3
+          resources:
+{{ toYaml .Values.resources | indent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+      volumes:
+        - name: config
+          configMap:
+            name: haproxy-config
+        - name: mtls
+          secret:
+            secretName: {{ .Values.mtls.secretName }}
+            defaultMode: 0400
+
+## network 
+
+{{- if .Values.networkPolicy.enabled }}
+
+---
+# Default Deny All Egress
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Namespace }}-default-deny-egress
+  namespace: {{ .Release.Namespace }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress: []
+
+---
+# Allow DNS (kube-dns only)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Namespace }}-allow-dns
+  namespace: {{ .Release.Namespace }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+---
+# Allow Pods → HAProxy Only
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Namespace }}-allow-egress-haproxy
+  namespace: {{ .Release.Namespace }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: haproxy-egress
+      ports:
+        - protocol: TCP
+          port: {{ .Values.service.port }}
+
+---
+# Allow HAProxy → External CIDRs
+{{- if .Values.networkPolicy.externalCidrs }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Namespace }}-allow-haproxy-external
+  namespace: {{ .Release.Namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app: haproxy-egress
+  policyTypes:
+    - Egress
+  egress:
+{{- range .Values.networkPolicy.externalCidrs }}
+    - to:
+        - ipBlock:
+            cidr: {{ . }}
+      ports:
+        - protocol: TCP
+          port: 443  # External services typically use 443
+{{- end }}
+{{- end }}
+
+---
+# Optional — Allow Internal CIDRs
+{{- if .Values.networkPolicy.internalCidrs }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Namespace }}-allow-internal
+  namespace: {{ .Release.Namespace }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+{{- range .Values.networkPolicy.internalCidrs }}
+    - to:
+        - ipBlock:
+            cidr: {{ . }}
+{{- end }}
+{{- end }}
+
+{{- end }}
+
+## over
+
+namespace: flows-pen-test
+clusterName: aks-scp-prd-uks-st-pen
+appName: mtls-outbound
+
+mtls:
+  certPath: /etc/mtls
+  secretName: haproxy-mtls-secret  
+  domains:
+    - name: visa
+      host: r1r2.3disystems.com
+      port: 443
+      clientCombinedPem: {{ fetchSecretValue "ref+op://Customers/visa/mtls-outbound-certs/client-combined-pem"  }}
+      caBundlePem: {{ fetchSecretValue "ref+op://Customers/visa/mtls-outbound-certs/crt-bundle"  }}
+
+networkPolicy:
+  enabled: true
+  externalCidrs:
+    - 13.91.0.38/32
+  internalCidrs:
+    - 10.120.0.0/16
+    - 172.16.0.0/16
+
+## helm
+
+helmDefaults:
+  timeout: 1500
+  wait: true
+  kubeContext: aks-scp-prd-uks-st-pen
+
+releases:
+  - name: haproxy-egress
+    namespace: flows-pen-test
+    chart: ../../../templated-overrides/raw-yaml-charts/mtls-outbound
+    values:
+      - namespace.overrides.gotmpl
+      
