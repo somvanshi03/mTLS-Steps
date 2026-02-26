@@ -24,7 +24,7 @@ spec:
         checksum/secret: {{ include (print $.Template.BasePath "/secrets.yaml") . | sha256sum }}
     spec:
       securityContext:
-        fsGroup: 1000  # Moved here from container level
+        fsGroup: 1000
       affinity:
         podAntiAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
@@ -78,7 +78,6 @@ spec:
             runAsNonRoot: true
             runAsUser: 1000
             runAsGroup: 1000
-            # fsGroup removed from here
       volumes:
         - name: config
           configMap:
