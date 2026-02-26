@@ -1,12 +1,11 @@
-INFO: Running docker container...
-  helmfile initialization completed!
+helmfile initialization completed!
   Building dependency release=haproxy-egress, chart=../../../templated-overrides/raw-yaml-charts/mtls-outbound
   Listing releases matching ^haproxy-egress$
   Upgrading release=haproxy-egress, chart=../../../templated-overrides/raw-yaml-charts/mtls-outbound
   Release "haproxy-egress" does not exist. Installing it now.
   FAILED RELEASES:
   NAME             NAMESPACE        CHART                                                        VERSION   DURATION
-  haproxy-egress   flows-pen-test   ../../../templated-overrides/raw-yaml-charts/mtls-outbound                   7s
+  haproxy-egress   flows-pen-test   ../../../templated-overrides/raw-yaml-charts/mtls-outbound                   5s
   in /opt/workspace/apps/mtls-outbound/flows-pen-test/helmfile.yaml: failed processing release haproxy-egress: command "/opt/deploy-work-dir/helm" exited with non-zero status:
   PATH:
     /opt/deploy-work-dir/helm
@@ -27,7 +26,7 @@ INFO: Running docker container...
     13: --namespace (11 bytes)
     14: flows-pen-test (14 bytes)
     15: --values (8 bytes)
-    16: /tmp/helmfile1854994282/flows-pen-test-haproxy-egress-values-56944b8448 (71 bytes)
+    16: /tmp/helmfile3667069474/flows-pen-test-haproxy-egress-values-56944b8448 (71 bytes)
     17: --reset-values (14 bytes)
     18: --history-max (13 bytes)
     19: 10 (2 bytes)
@@ -42,3 +41,4 @@ INFO: Running docker container...
     Release "haproxy-egress" does not exist. Installing it now.
     Error: 1 error occurred:
     	* Secret in version "v1" cannot be handled as a Secret: illegal base64 data at input byte 6392
+  Error: Process completed with exit code 1.
