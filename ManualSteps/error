@@ -1,36 +1,137 @@
-# Get the pod name
 POD=$(kubectl get pods -n flows-pen-test -l app=haproxy-egress -o jsonpath='{.items[0].metadata.name}')
+root@jumpbox:~# kubectl describe pod $POD -n flows-pen-test
+Name:             haproxy-egress-d6785787f-cqgql
+Namespace:        flows-pen-test
+Priority:         0
+Service Account:  default
+Node:             aks-nodepool1-37603420-vmss00000h/10.120.3.235
+Start Time:       Thu, 26 Feb 2026 08:42:01 -0600
+Labels:           app=haproxy-egress
+                  pod-template-hash=d6785787f
+Annotations:      checksum/config: ff389adaff2563c3e11822eb139e3a9e7b191efa31fce70fb897a005b3109195
+                  checksum/secret: cb2ba8eebb0c992d731f7559fde672bf1c2cdbebf90aeb82b0529e2269fc948d
+Status:           Running
+IP:               10.120.5.55
+IPs:
+  IP:           10.120.5.55
+Controlled By:  ReplicaSet/haproxy-egress-d6785787f
+Containers:
+  haproxy:
+    Container ID:  containerd://edcffe5c5facfcf5ec96db6534ee59578d31a7a25ea2cc94267135ed576bf174
+    Image:         haproxy:2.9
+    Image ID:      docker.io/library/haproxy@sha256:81506628494800519f82caf4128cb693df21ee5f38fca467224fcff508d537de
+    Port:          8443/TCP
+    Host Port:     0/TCP
+    Args:
+      -f
+      /usr/local/etc/haproxy/haproxy.cfg
+      -db
+    State:          Waiting
+      Reason:       CrashLoopBackOff
+    Last State:     Terminated
+      Reason:       Error
+      Exit Code:    1
+      Started:      Thu, 26 Feb 2026 08:53:10 -0600
+      Finished:     Thu, 26 Feb 2026 08:53:10 -0600
+    Ready:          False
+    Restart Count:  7
+    Limits:
+      cpu:     200m
+      memory:  256Mi
+    Requests:
+      cpu:        50m
+      memory:     64Mi
+    Liveness:     http-get http://:8443/health delay=10s timeout=1s period=20s #success=1 #failure=3
+    Readiness:    http-get http://:8443/health delay=5s timeout=1s period=10s #success=1 #failure=3
+    Environment:  <none>
+    Mounts:
+      /etc/mtls from mtls (ro)
+      /usr/local/etc/haproxy/haproxy.cfg from config (rw,path="haproxy.cfg")
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-qhq9q (ro)
+Conditions:
+  Type                        Status
+  PodReadyToStartContainers   True
+  Initialized                 True
+  Ready                       False
+  ContainersReady             False
+  PodScheduled                True
+Volumes:
+  config:
+    Type:      ConfigMap (a volume populated by a ConfigMap)
+    Name:      haproxy-config
+    Optional:  false
+  mtls:
+    Type:        Secret (a volume populated by a Secret)
+    SecretName:  haproxy-mtls-secret
+    Optional:    false
+  kube-api-access-qhq9q:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    ConfigMapOptional:       <nil>
+    DownwardAPI:             true
+QoS Class:                   Burstable
+Node-Selectors:              <none>
+Tolerations:                 node.kubernetes.io/memory-pressure:NoSchedule op=Exists
+                             node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:
+  Type     Reason     Age                  From               Message
+  ----     ------     ----                 ----               -------
+  Normal   Scheduled  15m                  default-scheduler  Successfully assigned flows-pen-test/haproxy-egress-d6785787f-cqgql to aks-nodepool1-37603420-vmss00000h
+  Normal   Pulled     4m19s (x8 over 15m)  kubelet            Container image "haproxy:2.9" already present on machine
+  Normal   Created    4m19s (x8 over 15m)  kubelet            Created container: haproxy
+  Normal   Started    4m19s (x8 over 15m)  kubelet            Started container haproxy
+  Warning  BackOff    14s (x77 over 15m)   kubelet            Back-off restarting failed container haproxy in pod haproxy-egress-d6785787f-cqgql_flows-pen-test(2707a10e-b95c-45b4-b0d3-10b6e8ae2b81)
 
-# Describe the pod to see volume mount issues
-kubectl describe pod $POD -n flows-pen-test
 
-# Check the pod's events
+
+
 kubectl get events -n flows-pen-test --field-selector involvedObject.name=$POD
+LAST SEEN   TYPE      REASON      OBJECT                               MESSAGE
+15m         Normal    Scheduled   pod/haproxy-egress-d6785787f-cqgql   Successfully assigned flows-pen-test/haproxy-egress-d6785787f-cqgql to aks-nodepool1-37603420-vmss00000h
+4m46s       Normal    Pulled      pod/haproxy-egress-d6785787f-cqgql   Container image "haproxy:2.9" already present on machine
+4m46s       Normal    Created     pod/haproxy-egress-d6785787f-cqgql   Created container: haproxy
+4m46s       Normal    Started     pod/haproxy-egress-d6785787f-cqgql   Started container haproxy
+41s         Warning   BackOff     pod/haproxy-egress-d6785787f-cqgql   Back-off restarting failed container haproxy in pod haproxy-egress-d6785787f-cqgql_flows-pen-test(2707a10e-b95c-45b4-b0d3-10b6e8ae2b81)
 
-# Check the deployment's volume mounts
+
+
 kubectl get deployment -n flows-pen-test haproxy-egress -o yaml | grep -A 15 "volumes:"
-kubectl get deployment -n flows-pen-test haproxy-egress -o yaml | grep -A 15 "volumeMounts:"
-
-
-
       volumes:
-        - name: mtls
-          secret:
-            secretName: {{ .Values.mtls.secretName }}
-            defaultMode: 0444
-            items:
-            {{- range .Values.mtls.domains }}
-            - key: {{ .name }}-ca-bundle.crt
-              path: {{ .name }}-ca-bundle.crt
-            - key: {{ .name }}-client-combined.pem
-              path: {{ .name }}-client-combined.pem
-            {{- end }}
+      - configMap:
+          defaultMode: 420
+          name: haproxy-config
+        name: config
+      - name: mtls
+        secret:
+          defaultMode: 256
+          secretName: haproxy-mtls-secret
+status:
+  conditions:
+  - lastTransitionTime: "2026-02-26T14:42:01Z"
+    lastUpdateTime: "2026-02-26T14:42:01Z"
+    message: Deployment does not have minimum availability.
+    reason: MinimumReplicasUnavailable
+    status: "False"
 
 
+kubectl get deployment -n flows-pen-test haproxy-egress -o yaml | grep -A 15 "volumeMounts:"
+        volumeMounts:
+        - mountPath: /usr/local/etc/haproxy/haproxy.cfg
+          name: config
+          subPath: haproxy.cfg
+        - mountPath: /etc/mtls
+          name: mtls
+          readOnly: true
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - configMap:
+          defaultMode: 420
+          name: haproxy-config
 
-          securityContext:
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: false
-            runAsNonRoot: true
-            runAsUser: 1000
-            runAsGroup: 1000
+
