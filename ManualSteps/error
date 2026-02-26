@@ -1,14 +1,36 @@
-kubectl get configmap -n flows-pen-test haproxy-config -o yaml |grep -A 5 "backend be_visa"
-      use_backend be_visa if host_visa
+# Get the pod name
+POD=$(kubectl get pods -n flows-pen-test -l app=haproxy-egress -o jsonpath='{.items[0].metadata.name}')
 
-    backend health_check
-      mode http
-      http-request return status 200 content-type text/plain lf-string "OK\n"
+# Describe the pod to see volume mount issues
+kubectl describe pod $POD -n flows-pen-test
 
---
-    backend be_visa
-      mode http
-      server target r1r2.3disystems.com:443 ssl verify required crt /etc/mtls/visa-client-combined.pem ca-file /etc/mtls/visa-ca-bundle.crt sni str(r1r2.3disystems.com) alpn h2,http/1.1 resolvers dns resolve-prefer ipv4 check inter 30s fall 3 rise 2
-kind: ConfigMap
-metadata:
-  annotations:
+# Check the pod's events
+kubectl get events -n flows-pen-test --field-selector involvedObject.name=$POD
+
+# Check the deployment's volume mounts
+kubectl get deployment -n flows-pen-test haproxy-egress -o yaml | grep -A 15 "volumes:"
+kubectl get deployment -n flows-pen-test haproxy-egress -o yaml | grep -A 15 "volumeMounts:"
+
+
+
+      volumes:
+        - name: mtls
+          secret:
+            secretName: {{ .Values.mtls.secretName }}
+            defaultMode: 0444
+            items:
+            {{- range .Values.mtls.domains }}
+            - key: {{ .name }}-ca-bundle.crt
+              path: {{ .name }}-ca-bundle.crt
+            - key: {{ .name }}-client-combined.pem
+              path: {{ .name }}-client-combined.pem
+            {{- end }}
+
+
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
