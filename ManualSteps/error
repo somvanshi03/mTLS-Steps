@@ -1,9 +1,10 @@
-kubectl exec -it haproxy-egress-d6785787f-cqgql -n flows-pen-test -- ls -al /ect/mtls
-error: unable to upgrade connection: container not found ("haproxy")
-root@jumpbox:~# kubectl logs -f haproxy-egress-d6785787f-cqgql -n flows-pen-test
-[NOTICE]   (1) : haproxy version is 2.9.15-e872a3f
-[NOTICE]   (1) : path to executable is /usr/local/sbin/haproxy
-[ALERT]    (1) : config : [/usr/local/etc/haproxy/haproxy.cfg:41] : 'server be_visa/target' : Couldn't open the ca-file '/etc/mtls/visa-ca-bundle.crt' ((null)).
-[ALERT]    (1) : config : 'ca-file' : unable to load /etc/mtls/visa-ca-bundle.crt.
-[ALERT]    (1) : config : Error(s) found in configuration file : /usr/local/etc/haproxy/haproxy.cfg
-[ALERT]    (1) : config : Fatal errors found in configuration.
+Events:
+  Type     Reason     Age                   From               Message
+  ----     ------     ----                  ----               -------
+  Normal   Scheduled  5m6s                  default-scheduler  Successfully assigned flows-pen-test/haproxy-egress-d6785787f-cqgql to aks-nodepool1-37603420-vmss00000h
+  Normal   Pulled     108s (x6 over 5m6s)   kubelet            Container image "haproxy:2.9" already present on machine
+  Normal   Created    108s (x6 over 5m6s)   kubelet            Created container: haproxy
+  Normal   Started    108s (x6 over 5m6s)   kubelet            Started container haproxy
+  Warning  BackOff    65s (x25 over 4m59s)  kubelet            Back-off restarting failed container haproxy in pod haproxy-egress-d6785787f-cqgql_flows-pen-test(2707a10e-b95c-45b4-b0d3-10b6e8ae2b81)
+
+haproxy-egress-d6785787f-cqgql                        0/1     CrashLoopBackOff   1 (9s ago)    16s
