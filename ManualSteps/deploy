@@ -76,6 +76,7 @@ spec:
             runAsNonRoot: true
             runAsUser: 1000
             runAsGroup: 1000
+            fsGroup: 1000
       volumes:
         - name: config
           configMap:
@@ -83,4 +84,11 @@ spec:
         - name: mtls
           secret:
             secretName: {{ .Values.mtls.secretName }}
-            defaultMode: 0400
+            defaultMode: 0644
+            items:
+            {{- range .Values.mtls.domains }}
+            - key: {{ .name }}-ca-bundle.crt
+              path: {{ .name }}-ca-bundle.crt
+            - key: {{ .name }}-client-combined.pem
+              path: {{ .name }}-client-combined.pem
+            {{- end }}
