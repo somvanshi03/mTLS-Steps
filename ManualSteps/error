@@ -1,4 +1,4 @@
-kubectl logs -f haproxy-egress-8499b6bd7b-hhfd6 -n flows-pen-test
+kubectl logs -f haproxy-egress-56458ffd64-rtd8x -n flows-pen-test
 [NOTICE]   (1) : haproxy version is 2.9.15-e872a3f
 [NOTICE]   (1) : path to executable is /usr/local/sbin/haproxy
 [ALERT]    (1) : config : [/usr/local/etc/haproxy/haproxy.cfg:41] : 'server be_visa/target' : Couldn't open the ca-file '/etc/mtls/visa-ca-bundle.crt' (no certificate or crl found).
