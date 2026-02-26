@@ -1,11 +1,9 @@
-kubectl logs -f haproxy-egress-58dcdd98dc-m8p5h -n flows-pen-test
+kubectl exec -it haproxy-egress-d6785787f-cqgql -n flows-pen-test -- ls -al /ect/mtls
+error: unable to upgrade connection: container not found ("haproxy")
+root@jumpbox:~# kubectl logs -f haproxy-egress-d6785787f-cqgql -n flows-pen-test
 [NOTICE]   (1) : haproxy version is 2.9.15-e872a3f
 [NOTICE]   (1) : path to executable is /usr/local/sbin/haproxy
 [ALERT]    (1) : config : [/usr/local/etc/haproxy/haproxy.cfg:41] : 'server be_visa/target' : Couldn't open the ca-file '/etc/mtls/visa-ca-bundle.crt' ((null)).
 [ALERT]    (1) : config : 'ca-file' : unable to load /etc/mtls/visa-ca-bundle.crt.
 [ALERT]    (1) : config : Error(s) found in configuration file : /usr/local/etc/haproxy/haproxy.cfg
 [ALERT]    (1) : config : Fatal errors found in configuration.
-
-
-kubectl exec -it haproxy-egress-58dcdd98dc-m8p5h -n flows-pen-test -- ls -al /ect/mtls
-error: unable to upgrade connection: container not found ("haproxy")
