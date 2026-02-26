@@ -1,0 +1,9 @@
+mtls:
+  certPath: /etc/mtls
+  secretName: haproxy-mtls-secret  
+  domains:
+    - name: visa
+      host: r1r2.3disystems.com
+      port: 443
+      clientCombinedPem: {{ fetchSecretValue "ref+op://Customers/visa/mtls-outbound-certs/client-combined-pem" }}
+      caBundlePem: {{ fetchSecretValue "ref+op://Customers/visa/mtls-outbound-certs/crt-bundle" }}
