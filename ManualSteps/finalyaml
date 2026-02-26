@@ -150,7 +150,7 @@ spec:
         app: haproxy-egress
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
-        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/secrets.yaml") . | sha256sum }}  # Fixed: secret -> secrets
     spec:
       affinity:
         podAntiAffinity:
