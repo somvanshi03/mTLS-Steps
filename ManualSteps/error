@@ -1,45 +1,7 @@
-  INFO: Running docker container...
-  helmfile initialization completed!
-  Building dependency release=haproxy-egress, chart=../../../templated-overrides/raw-yaml-charts/mtls-outbound
-  Listing releases matching ^haproxy-egress$
-  Upgrading release=haproxy-egress, chart=../../../templated-overrides/raw-yaml-charts/mtls-outbound
-  Release "haproxy-egress" does not exist. Installing it now.
-  FAILED RELEASES:
-  NAME             NAMESPACE        CHART                                                        VERSION   DURATION
-  haproxy-egress   flows-pen-test   ../../../templated-overrides/raw-yaml-charts/mtls-outbound                   5s
-  in /opt/workspace/apps/mtls-outbound/flows-pen-test/helmfile.yaml: failed processing release haproxy-egress: command "/opt/deploy-work-dir/helm" exited with non-zero status:
-  PATH:
-    /opt/deploy-work-dir/helm
-  ARGS:
-    0: helm (4 bytes)
-    1: --kube-context (14 bytes)
-    2: aks-scp-prd-uks-st-pen (22 bytes)
-    3: upgrade (7 bytes)
-    4: --install (9 bytes)
-    5: haproxy-egress (14 bytes)
-    6: ../../../templated-overrides/raw-yaml-charts/mtls-outbound (58 bytes)
-    7: --wait (6 bytes)
-    8: --timeout (9 bytes)
-    9: 1500s (5 bytes)
-    10: --create-namespace (18 bytes)
-    11: --kube-context (14 bytes)
-    12: aks-scp-prd-uks-st-pen (22 bytes)
-    13: --namespace (11 bytes)
-    14: flows-pen-test (14 bytes)
-    15: --values (8 bytes)
-    16: /tmp/helmfile579048555/flows-pen-test-haproxy-egress-values-56944b8448 (70 bytes)
-    17: --reset-values (14 bytes)
-    18: --history-max (13 bytes)
-    19: 10 (2 bytes)
-  ERROR:
-    exit status 1
-  EXIT STATUS
-    1
-  STDERR:
-    Error: 1 error occurred:
-    	* Secret in version "v1" cannot be handled as a Secret: illegal base64 data at input byte 6392
-  COMBINED OUTPUT:
-    Release "haproxy-egress" does not exist. Installing it now.
-    Error: 1 error occurred:
-    	* Secret in version "v1" cannot be handled as a Secret: illegal base64 data at input byte 6392
-  Error: Process completed with exit code 1.
+kubectl logs -f haproxy-egress-8499b6bd7b-hhfd6 -n flows-pen-test
+[NOTICE]   (1) : haproxy version is 2.9.15-e872a3f
+[NOTICE]   (1) : path to executable is /usr/local/sbin/haproxy
+[ALERT]    (1) : config : [/usr/local/etc/haproxy/haproxy.cfg:41] : 'server be_visa/target' : Couldn't open the ca-file '/etc/mtls/visa-ca-bundle.crt' (no certificate or crl found).
+[ALERT]    (1) : config : 'ca-file' : unable to load /etc/mtls/visa-ca-bundle.crt.
+[ALERT]    (1) : config : Error(s) found in configuration file : /usr/local/etc/haproxy/haproxy.cfg
+[ALERT]    (1) : config : Fatal errors found in configuration.
