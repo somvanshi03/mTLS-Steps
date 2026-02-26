@@ -1,7 +1,18 @@
-kubectl logs -f haproxy-egress-56458ffd64-rtd8x -n flows-pen-test
-[NOTICE]   (1) : haproxy version is 2.9.15-e872a3f
-[NOTICE]   (1) : path to executable is /usr/local/sbin/haproxy
-[ALERT]    (1) : config : [/usr/local/etc/haproxy/haproxy.cfg:41] : 'server be_visa/target' : Couldn't open the ca-file '/etc/mtls/visa-ca-bundle.crt' (no certificate or crl found).
-[ALERT]    (1) : config : 'ca-file' : unable to load /etc/mtls/visa-ca-bundle.crt.
-[ALERT]    (1) : config : Error(s) found in configuration file : /usr/local/etc/haproxy/haproxy.cfg
-[ALERT]    (1) : config : Fatal errors found in configuration.
+# Get the pod name
+POD=$(kubectl get pods -n flows-pen-test -l app=haproxy-egress -o jsonpath='{.items[0].metadata.name}')
+
+# Check if files exist and their size
+kubectl exec -it $POD -n flows-pen-test -- ls -la /etc/mtls/
+
+# Check the CA bundle content (first few lines)
+kubectl exec -it $POD -n flows-pen-test -- cat /etc/mtls/visa-ca-bundle.crt | head -20
+
+# Check the client certificate content
+kubectl exec -it $POD -n flows-pen-test -- cat /etc/mtls/visa-client-combined.pem | head -20
+
+# Decode and check CA bundle from secret
+kubectl get secret -n flows-pen-test haproxy-mtls-secret -o jsonpath='{.data.visa-ca-bundle\.crt}' | base64 -d | head -20
+
+# Decode and check client certificate
+kubectl get secret -n flows-pen-test haproxy-mtls-secret -o jsonpath='{.data.visa-client-combined\.pem}' | base64 -d | head -20
+
