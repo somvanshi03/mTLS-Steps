@@ -1,4 +1,5 @@
-helmfile initialization completed!
+  INFO: Running docker container...
+  helmfile initialization completed!
   Building dependency release=haproxy-egress, chart=../../../templated-overrides/raw-yaml-charts/mtls-outbound
   Listing releases matching ^haproxy-egress$
   Upgrading release=haproxy-egress, chart=../../../templated-overrides/raw-yaml-charts/mtls-outbound
@@ -26,7 +27,7 @@ helmfile initialization completed!
     13: --namespace (11 bytes)
     14: flows-pen-test (14 bytes)
     15: --values (8 bytes)
-    16: /tmp/helmfile3667069474/flows-pen-test-haproxy-egress-values-56944b8448 (71 bytes)
+    16: /tmp/helmfile579048555/flows-pen-test-haproxy-egress-values-56944b8448 (70 bytes)
     17: --reset-values (14 bytes)
     18: --history-max (13 bytes)
     19: 10 (2 bytes)
